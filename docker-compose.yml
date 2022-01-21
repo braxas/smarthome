@@ -1,0 +1,66 @@
+version: '2'
+
+volumes:
+  spotifycache:
+
+services:
+  frontend:
+    build: ./frontend
+    expose:
+      - "80"
+  proxy:
+    build: ./haproxy
+    depends_on:
+      - frontend
+      - data
+    ports:
+      - "80:80"
+  data:
+    build: ./data
+    expose:
+      - "8080"
+  browser:
+    image: balenablocks/browser
+    privileged: true # required for UDEV to find plugged in peripherals such as a USB mouse
+    network_mode: host
+    ports:
+        - '5011' # management API (optional)
+        - '35173' # Chromium debugging port (optional)
+    volumes:
+      - 'settings:/data' # Only required if using PERSISTENT flag (see below)
+browsercontrol:
+    image: balenablocks/browsercontrol
+    restart: always
+    network_mode: host
+    privileged: true
+    ports:
+      - 80:80
+audio:
+    build: ./core/audio
+    privileged: true
+    labels:
+      io.balena.features.dbus: 1
+      io.balena.features.supervisor-api: 1
+    ports:
+      - 4317:4317
+
+sound-supervisor:
+    build: 
+      context: .
+      dockerfile: ./core/sound-supervisor/Dockerfile.template
+    network_mode: host
+    labels:
+      io.balena.features.balena-api: '1'
+      io.balena.features.supervisor-api: 1
+
+multiroom-server:
+    build: ./core/multiroom/server
+    restart: on-failure
+    ports:
+      - 1704:1704
+      - 1705:1705
+      - 1780:1780
+
+multiroom-client:
+    build: ./core/multiroom/client
+    restart: on-failure
